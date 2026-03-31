@@ -7,5 +7,5 @@
   },
   "references": [{ "path": "../../packages/shared" }],
   "include": ["src/**/*.ts"],
-  "exclude": ["dist", "src/**/*.test.ts"]
+  "exclude": ["dist", "src/**/*.test.ts", "src/test-support/**/*.ts"]
 }

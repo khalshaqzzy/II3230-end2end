@@ -3,7 +3,15 @@ import express from 'express';
 import type { AppEnv } from '@ii3230/shared';
 import type { Logger } from 'pino';
 
-export const createApp = (input: { env: AppEnv; logger: Logger }) => {
+import { createBobRouter } from './modules/bob/router';
+import { createMessagesRouter } from './modules/messages/router';
+import type { AppRuntime } from './runtime/create-app-runtime';
+
+export const createApp = (input: {
+  env: AppEnv;
+  logger: Logger;
+  runtime: AppRuntime;
+}) => {
   const app = express();
 
   app.disable('x-powered-by');
@@ -35,6 +43,13 @@ export const createApp = (input: { env: AppEnv; logger: Logger }) => {
     });
   });
 
+  app.use(createBobRouter({ bobService: input.runtime.bobService }));
+  app.use(
+    createMessagesRouter({
+      messageQueryService: input.runtime.messageQueryService,
+    }),
+  );
+
   app.use(
     (
       error: unknown,
@@ -42,6 +57,20 @@ export const createApp = (input: { env: AppEnv; logger: Logger }) => {
       response: express.Response,
       _next: express.NextFunction,
     ) => {
+      if (error instanceof SyntaxError && 'body' in error) {
+        response.status(400).json({
+          status: 'error',
+          code: 'invalid_payload',
+          issues: [
+            {
+              code: 'invalid_json',
+              message: 'Request body must be valid JSON.',
+            },
+          ],
+        });
+        return;
+      }
+
       input.logger.error({ err: error }, 'Unhandled request error');
 
       response.status(500).json({
