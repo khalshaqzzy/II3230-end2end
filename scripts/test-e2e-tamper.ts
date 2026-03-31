@@ -9,8 +9,10 @@ import { loadScriptEnv, printJson, resolveTargetBaseUrl, writeJsonOutput } from 
 import {
   assertRejectedVerdict,
   createArtifactRunDirectory,
+  createTestRunId,
+  createTestingHeaders,
   writeMessageArtifacts,
-} from './support/phase4';
+} from './support/validation-artifacts';
 
 const mutateEncodedValue = (value: string, replacements: [string, string]) => {
   if (value.length <= 1) {
@@ -64,6 +66,7 @@ const main = async () => {
     keyMaterial: loadAliceSendKeyMaterial(env),
   });
   const runDir = createArtifactRunDirectory();
+  const testRunId = createTestRunId();
 
   const scenarios = [
     {
@@ -164,6 +167,11 @@ const main = async () => {
       url: `${targetBaseUrl}/internal/messages/receive`,
       method: 'POST',
       body: payload,
+      headers: createTestingHeaders({
+        validationMode: 'phase4_tamper',
+        testRunId,
+        scenario: scenario.name,
+      }),
     });
 
     assertRejectedVerdict({
@@ -174,6 +182,7 @@ const main = async () => {
 
     writeJsonOutput(path.join(runDir, scenario.responseFile), {
       targetBaseUrl,
+      testRunId,
       scenario: scenario.name,
       payload,
       response,
@@ -197,6 +206,7 @@ const main = async () => {
   const summary = {
     targetBaseUrl,
     artifactDir: runDir,
+    testRunId,
     tamperScenarios: results,
   };
 

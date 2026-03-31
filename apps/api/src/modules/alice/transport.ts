@@ -36,6 +36,9 @@ export interface BobTransportClient {
   sendPayload: (
     baseUrl: string,
     payload: MessagePayload,
+    options?: {
+      headers?: Record<string, string | undefined>;
+    },
   ) => Promise<BobTransportResult>;
 }
 
@@ -43,15 +46,21 @@ export const createBobTransportClient = (input: {
   logger: Logger;
 }): BobTransportClient => {
   return {
-    sendPayload: async (baseUrl, payload) => {
+    sendPayload: async (baseUrl, payload, options) => {
       const targetUrl = `${normalizeBaseUrl(baseUrl)}/internal/messages/receive`;
+      const headers = {
+        'content-type': 'application/json',
+        ...Object.fromEntries(
+          Object.entries(options?.headers ?? {}).filter(
+            ([, value]) => value !== undefined,
+          ),
+        ),
+      };
 
       try {
         const response = await fetch(targetUrl, {
           method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-          },
+          headers,
           body: JSON.stringify(payload),
         });
 

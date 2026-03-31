@@ -9,20 +9,20 @@ Runbook ini dipakai untuk membuktikan bahwa sistem benar-benar berjalan dalam sk
 - Alice mengirim pesan dari satu device
 - Bob menerima dan memverifikasi pesan di device lain
 - komunikasi terjadi melalui alamat IP di jaringan lokal
-- sistem menghasilkan bukti yang bisa dipakai untuk evaluasi atau laporan
+- sistem menghasilkan artefak yang bisa dipakai untuk evaluasi, laporan, atau demo
 
-Target utama adalah memastikan tiga hal berikut:
+Target pengujian yang harus tervalidasi:
 
 1. happy path berjalan end to end
 2. skenario manipulasi payload ditolak pada tahap yang benar
-3. artefak hasil uji tersimpan dan bisa ditinjau ulang
+3. message detail dan event log cukup kaya untuk dibaca ulang setelah test selesai
 
-## Gambaran Sederhana Topologi
+## Gambaran Topologi
 
 Pengujian dilakukan dengan dua device dalam satu LAN.
 
 - Device A berperan sebagai Alice
-  - digunakan untuk mengirim pesan dan menjalankan script pengujian
+  - dipakai untuk menjalankan script pengiriman dan script validasi
 - Device B berperan sebagai Bob
   - menjalankan API penerima
   - menyimpan message detail, verdict, dan event log
@@ -41,19 +41,19 @@ http://192.168.1.20:4000
 
 ## Sebelum Mulai
 
-Pastikan hal berikut sudah tersedia di kedua device:
+Pastikan hal berikut sudah tersedia:
 
-- repo project ini sudah ada
+- repo project ini ada di kedua device
 - dependency project sudah terpasang
-- kedua device berada di jaringan lokal yang sama
-- Device A dapat menjangkau IP Device B
-- port `4000` di Device B tidak diblokir firewall lokal
+- kedua device ada di jaringan lokal yang sama
+- Device A bisa menjangkau IP Device B
+- port `4000` di Device B tidak diblokir
 
 Disarankan melakukan pengecekan sederhana dulu dari Device A ke Device B, misalnya ping atau akses HTTP ke IP Bob jika environment memungkinkan.
 
 ## Penempatan Key
 
-Sistem sekarang memakai direktori key lokal yang konsisten:
+Direktori key lokal yang dipakai sistem:
 
 ```text
 .local/data/keys/
@@ -65,11 +65,9 @@ Generate keypair dari root repo:
 npm run keys:generate:local
 ```
 
-Setelah generate, distribusikan file sesuai peran tester:
-
 ### Key yang dibutuhkan di Device A
 
-Device A hanya perlu key untuk mengirim sebagai Alice:
+Device A hanya perlu key untuk bertindak sebagai Alice:
 
 - `.local/data/keys/alice/private.pem`
 - `.local/data/keys/alice/public.pem`
@@ -79,7 +77,7 @@ Device A tidak perlu Bob private key.
 
 ### Key yang dibutuhkan di Device B
 
-Device B hanya perlu key untuk menerima dan memverifikasi sebagai Bob:
+Device B hanya perlu key untuk bertindak sebagai Bob:
 
 - `.local/data/keys/alice/public.pem`
 - `.local/data/keys/bob/private.pem`
@@ -126,7 +124,7 @@ Expected result:
 - `/health` mengembalikan status `ok`
 - `/ready` mengembalikan status `ready`
 
-Jika dua endpoint ini gagal diakses, jangan lanjut ke pengujian berikutnya. Masalah biasanya ada pada IP target, port, firewall, atau Bob belum berjalan.
+Jika dua endpoint ini gagal diakses, jangan lanjut ke pengujian berikutnya. Biasanya masalah ada pada IP target, port, firewall, atau Bob belum benar-benar berjalan.
 
 ## Langkah 3: Menyiapkan Alice di Device A
 
@@ -149,7 +147,7 @@ Ganti `<bob-lan-ip>` dengan IP Device B yang benar.
 
 ## Langkah 4: Menjalankan Happy Path
 
-Ini adalah pengujian utama untuk memastikan skenario pengiriman pesan aman berjalan normal.
+Ini adalah pengujian utama untuk memastikan alur pengiriman pesan aman berjalan normal.
 
 Jalankan:
 
@@ -159,17 +157,19 @@ npm run test:e2e:local -- --env-file .env.alice.local
 
 Expected result:
 
-- test mendapatkan output JSON yang menandakan happy path `passed`
+- output JSON menandakan happy path `passed`
 - verdict akhir bernilai `accepted`
-- pesan berhasil diproses oleh Bob
+- Bob menyimpan hasil pengujian dengan `messageId` yang bisa ditinjau ulang
+- output juga menampilkan `testRunId` untuk menandai satu sesi pengujian
 
 Hal yang perlu dicatat saat testing:
 
 - `messageId`
+- `testRunId`
 - lokasi `artifactDir`
 - verdict akhir
 
-## Langkah 5: Meninjau Detail Pesan dan Log
+## Langkah 5: Meninjau Detail Pesan dan Event Log
 
 Jika Anda ingin melihat hasil pengujian lebih detail, gunakan `messageId` dari happy path tadi.
 
@@ -194,6 +194,10 @@ Saat meninjau hasil, perhatikan bahwa:
 - Bob berhasil mendekripsi plaintext
 - integrity check sukses
 - signature verification sukses
+- timeline event memuat inferred Alice events untuk direct-LAN flow
+- event Bob memuat context request seperti `actualRequesterIp`, `remoteAddress`, `validationMode`, `testRunId`, dan `scenario`
+
+Dengan ini tester bisa membaca ulang bukan hanya hasil akhir, tetapi juga konteks bagaimana test itu dijalankan.
 
 ## Langkah 6: Menjalankan Negative Path
 
@@ -209,6 +213,7 @@ Expected result:
 
 - semua skenario tampil sebagai `passed`
 - setiap skenario gagal pada tahap verifikasi yang sesuai
+- setiap run negatif juga punya `testRunId` tersendiri
 
 Tahap kegagalan yang diharapkan:
 
@@ -217,7 +222,7 @@ Tahap kegagalan yang diharapkan:
 - signature tamper -> `verify_signature`
 - wrong-recipient-key -> `decrypt_symmetric_key`
 
-Ini penting untuk testing, karena yang divalidasi bukan hanya “gagal”, tetapi “gagal dengan alasan yang benar”.
+Ini penting, karena yang divalidasi bukan hanya “gagal”, tetapi “gagal dengan alasan yang benar”.
 
 ## Langkah 7: Menjalankan Uji Manual Jika Diperlukan
 
@@ -226,7 +231,7 @@ Jika Anda ingin menguji skenario tertentu secara manual, gunakan script berikut.
 Kirim pesan biasa:
 
 ```powershell
-npx tsx scripts/manual-send.ts --env-file .env.alice.local --target http://<bob-lan-ip>:4000 --message "Bob, ini pesan LAN Phase 4."
+npx tsx scripts/manual-send.ts --env-file .env.alice.local --target http://<bob-lan-ip>:4000 --message "Bob, ini pesan LAN untuk validasi lokal."
 ```
 
 Tamper ciphertext:
@@ -241,7 +246,7 @@ Simulasi wrong recipient key:
 npx tsx scripts/manual-tamper.ts --env-file .env.alice.local --target http://<bob-lan-ip>:4000 --scenario wrong-recipient-key
 ```
 
-Pengujian manual berguna jika testing ingin menunjukkan satu kasus spesifik saat demo atau saat debugging.
+Pengujian manual berguna jika tester ingin menunjukkan satu kasus spesifik saat demo atau saat debugging.
 
 ## Artefak Yang Harus Dicek
 
@@ -251,7 +256,7 @@ Setiap pengujian otomatis akan menulis hasil ke:
 artifacts/local-tests/<timestamp>/
 ```
 
-File yang biasanya perlu ketika testing:
+File yang biasanya perlu dicek:
 
 - `summary.json`
 - `happy-path-response.json`
@@ -263,7 +268,7 @@ File yang biasanya perlu ketika testing:
 - `logs/<messageId>.json`
 
 
-## Checklist Singkat Untuk Testing
+## Checklist Singkat
 
 Pengujian bisa dianggap selesai jika:
 
@@ -271,10 +276,10 @@ Pengujian bisa dianggap selesai jika:
 2. happy path menghasilkan verdict `accepted`
 3. empat skenario negative path semuanya lolos validasi
 4. artefak hasil uji tersimpan
-5. test dapat menunjukkan `messageId`, detail pesan, dan log verifikasi saat diminta
+5. tester dapat menunjukkan `messageId`, `testRunId`, detail pesan, dan log verifikasi saat diminta
 
 ## Catatan Penting
 
-- Jalur bukti saat ini yang paling penting adalah pengiriman langsung ke Bob melalui `/internal/messages/receive`
-- `POST /messages` masih ada, tetapi bukan jalur utama untuk validasi LAN dua device
-- runbook ini ditulis untuk testingr; jika hasil tidak sesuai, cek dulu env file, key placement, IP target, dan akses port `4000`
+- Jalur bukti utama untuk validasi LAN dua device adalah pengiriman langsung ke Bob melalui `/internal/messages/receive`
+- `POST /messages` masih ada, tetapi bukan jalur utama untuk pengujian LAN
+- jika hasil tidak sesuai, cek dulu env file, key placement, IP target, akses port `4000`, dan apakah Bob benar-benar listen di host yang tepat

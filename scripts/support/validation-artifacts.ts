@@ -1,10 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
 import type { MessageEvent, VerificationVerdict } from '@ii3230/shared';
 
-import { fetchJson } from './http';
 import { writeJsonOutput } from './cli';
+import { fetchJson } from './http';
 
 export interface MessageDetailArtifact {
   messageId: string;
@@ -24,6 +25,22 @@ export const createArtifactRunDirectory = () => {
   fs.mkdirSync(path.join(runDir, 'messages'), { recursive: true });
   fs.mkdirSync(path.join(runDir, 'logs'), { recursive: true });
   return runDir;
+};
+
+export const createTestRunId = () => {
+  return randomUUID();
+};
+
+export const createTestingHeaders = (input: {
+  validationMode: string;
+  testRunId: string;
+  scenario?: string;
+}) => {
+  return {
+    'x-ii3230-validation-mode': input.validationMode,
+    'x-ii3230-test-run-id': input.testRunId,
+    'x-ii3230-scenario': input.scenario,
+  };
 };
 
 export const fetchMessageDetail = async (
@@ -55,7 +72,10 @@ export const writeMessageArtifacts = async (input: {
     path.join(input.runDir, 'messages', `${input.messageId}.json`),
     detail,
   );
-  writeJsonOutput(path.join(input.runDir, 'logs', `${input.messageId}.json`), logs);
+  writeJsonOutput(
+    path.join(input.runDir, 'logs', `${input.messageId}.json`),
+    logs,
+  );
 
   return {
     detail,

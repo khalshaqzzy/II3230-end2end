@@ -92,10 +92,14 @@ describe('API routes', () => {
   it('processes a valid Bob payload and exposes persisted evidence', async () => {
     const harness = createTestHarness();
     const { payload, plaintext } = harness.createPayload();
+    const testRunId = 'test-run-direct-001';
 
     try {
       const processResponse = await request(harness.app)
         .post('/internal/messages/receive')
+        .set('x-ii3230-validation-mode', 'phase4_happy_path')
+        .set('x-ii3230-test-run-id', testRunId)
+        .set('x-ii3230-scenario', 'happy-path')
         .send(payload);
 
       expect(processResponse.status).toBe(200);
@@ -114,11 +118,32 @@ describe('API routes', () => {
       );
 
       expect(detailResponse.status).toBe(200);
+      expect(detailResponse.body.plaintext).toBe(plaintext);
       expect(detailResponse.body.decryptedPlaintext).toBe(plaintext);
       expect(detailResponse.body.verdict.reasonCode).toBe('accepted');
       expect(detailResponse.body.lifecycleState).toBe('processed');
-      expect(detailResponse.body.events[0].stage).toBe('receive_payload');
+      expect(detailResponse.body.events[0].actor).toBe('alice');
+      expect(detailResponse.body.events[0].stage).toBe('receive_plaintext');
+      expect(
+        detailResponse.body.events.some(
+          (event: { actor: string; stage: string }) =>
+            event.actor === 'alice' && event.stage === 'send_payload',
+        ),
+      ).toBe(true);
+      const receivePayloadEvent = detailResponse.body.events.find(
+        (event: { actor: string; stage: string }) =>
+          event.actor === 'bob' && event.stage === 'receive_payload',
+      );
+      expect(receivePayloadEvent.details.validationMode).toBe(
+        'phase4_happy_path',
+      );
+      expect(receivePayloadEvent.details.testRunId).toBe(testRunId);
+      expect(receivePayloadEvent.details.scenario).toBe('happy-path');
+      expect(receivePayloadEvent.details.actualRequesterIp).toBeDefined();
       expect(detailResponse.body.events.at(-1).stage).toBe('final_verdict');
+      expect(detailResponse.body.events.at(-1).details.testRunId).toBe(
+        testRunId,
+      );
 
       const serializedDetail = JSON.stringify(detailResponse.body);
       expect(serializedDetail).not.toContain('BEGIN PRIVATE KEY');

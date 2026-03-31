@@ -12,6 +12,10 @@ import {
   writeJsonOutput,
 } from './support/cli';
 import { fetchJson } from './support/http';
+import {
+  createTestRunId,
+  createTestingHeaders,
+} from './support/validation-artifacts';
 
 const mutateEncodedValue = (value: string, replacements: [string, string]) => {
   if (value.length <= 1) {
@@ -60,6 +64,9 @@ const { values } = parseArgs({
     'env-file': {
       type: 'string',
     },
+    'test-run-id': {
+      type: 'string',
+    },
   },
 });
 
@@ -96,6 +103,7 @@ if (values.scenario && !supportedScenarios.has(values.scenario)) {
 const main = async () => {
   const env = loadScriptEnv({ envFile: values['env-file'] });
   const targetBaseUrl = resolveTargetBaseUrl(values.target, env);
+  const testRunId = values['test-run-id'] ?? createTestRunId();
   let payload: Record<string, unknown>;
 
   if (values.scenario === 'wrong-recipient-key') {
@@ -158,10 +166,16 @@ const main = async () => {
     url: `${targetBaseUrl}/internal/messages/receive`,
     method: 'POST',
     body: payload,
+    headers: createTestingHeaders({
+      validationMode: 'manual_tamper',
+      testRunId,
+      scenario: values.scenario ?? values.field ?? 'manual-tamper',
+    }),
   });
 
   const result = sanitizeArtifactDetails({
     targetBaseUrl,
+    testRunId,
     field: values.field ?? null,
     scenario: values.scenario ?? null,
     payload,

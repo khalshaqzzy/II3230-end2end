@@ -16,10 +16,28 @@ import type {
   MessageRepository,
   ProcessedMessageRecord,
 } from '../messages/repository';
+import type { BobRequestContext } from './request-context';
 
 const nowIso = () => new Date().toISOString();
 
-const createEvent = (input: {
+const buildTestingContextDetails = (context?: BobRequestContext) => {
+  return {
+    validationMode: context?.validationMode ?? null,
+    testRunId: context?.testRunId ?? null,
+    scenario: context?.scenario ?? null,
+  };
+};
+
+const buildRequestContextDetails = (context?: BobRequestContext) => {
+  return {
+    actualRequesterIp: context?.actualRequesterIp ?? null,
+    remoteAddress: context?.remoteAddress ?? null,
+    forwardedFor: context?.forwardedFor ?? null,
+    userAgent: context?.userAgent ?? null,
+  };
+};
+
+const createBobEvent = (input: {
   messageId: string;
   stage: MessageEvent['stage'];
   status: MessageEvent['status'];
@@ -36,6 +54,27 @@ const createEvent = (input: {
       input.details ?? {},
     ) as MessageEvent['details'],
     timestamp: nowIso(),
+  };
+};
+
+const createInferredAliceEvent = (input: {
+  payload: MessagePayload;
+  stage: MessageEvent['stage'];
+  status: MessageEvent['status'];
+  summary: string;
+  timestamp: string;
+  details?: MessageEvent['details'];
+}): MessageEvent => {
+  return {
+    messageId: input.payload.messageId,
+    actor: 'alice',
+    stage: input.stage,
+    status: input.status,
+    summary: input.summary,
+    details: sanitizeArtifactDetails(
+      input.details ?? {},
+    ) as MessageEvent['details'],
+    timestamp: input.timestamp,
   };
 };
 
@@ -59,16 +98,125 @@ const createVerdict = (input: {
   };
 };
 
+const createInferredAliceTimeline = (input: {
+  payload: MessagePayload;
+  decryptedPlaintext: string | null;
+  context?: BobRequestContext;
+}) => {
+  const timestampBase = new Date(input.payload.timestamp).getTime();
+  const sharedDetails = {
+    ...buildTestingContextDetails(input.context),
+    transportPath: 'direct_bob_receive',
+  };
+  const nextTimestamp = (offsetMs: number) =>
+    new Date(timestampBase + offsetMs).toISOString();
+
+  return [
+    createInferredAliceEvent({
+      payload: input.payload,
+      stage: 'receive_plaintext',
+      status: 'success',
+      summary: 'Alice plaintext submission was inferred from the received payload.',
+      timestamp: nextTimestamp(0),
+      details: {
+        ...sharedDetails,
+        plaintextLength: input.decryptedPlaintext?.length ?? null,
+        senderIp: input.payload.sourceIp,
+        recipientIp: input.payload.destinationIp,
+      },
+    }),
+    createInferredAliceEvent({
+      payload: input.payload,
+      stage: 'generate_symmetric_key',
+      status: 'success',
+      summary: 'Alice symmetric-key generation was inferred from the received payload.',
+      timestamp: nextTimestamp(1),
+      details: {
+        ...sharedDetails,
+        algorithm: input.payload.algorithms.symmetric,
+      },
+    }),
+    createInferredAliceEvent({
+      payload: input.payload,
+      stage: 'encrypt_plaintext',
+      status: 'success',
+      summary: 'Alice plaintext encryption was inferred from the received payload.',
+      timestamp: nextTimestamp(2),
+      details: {
+        ...sharedDetails,
+        algorithm: input.payload.algorithms.symmetric,
+        ivB64: input.payload.ivB64,
+        authTagB64: input.payload.authTagB64,
+        ciphertextLength: input.payload.ciphertextB64.length,
+      },
+    }),
+    createInferredAliceEvent({
+      payload: input.payload,
+      stage: 'encrypt_symmetric_key',
+      status: 'success',
+      summary:
+        'Alice symmetric-key wrapping was inferred from the received payload.',
+      timestamp: nextTimestamp(3),
+      details: {
+        ...sharedDetails,
+        algorithm: input.payload.algorithms.asymmetricEncryption,
+        encryptedSymmetricKeyLength:
+          input.payload.encryptedSymmetricKeyB64.length,
+      },
+    }),
+    createInferredAliceEvent({
+      payload: input.payload,
+      stage: 'generate_hash',
+      status: 'success',
+      summary: 'Alice hash generation was inferred from the received payload.',
+      timestamp: nextTimestamp(4),
+      details: {
+        ...sharedDetails,
+        algorithm: input.payload.algorithms.hash,
+        plaintextHashHex: input.payload.plaintextHashHex,
+      },
+    }),
+    createInferredAliceEvent({
+      payload: input.payload,
+      stage: 'generate_signature',
+      status: 'success',
+      summary:
+        'Alice signature generation was inferred from the received payload.',
+      timestamp: nextTimestamp(5),
+      details: {
+        ...sharedDetails,
+        algorithm: input.payload.algorithms.signature,
+        signatureInputVersion: input.payload.signatureInputVersion,
+        signatureLength: input.payload.signatureB64.length,
+      },
+    }),
+    createInferredAliceEvent({
+      payload: input.payload,
+      stage: 'send_payload',
+      status: 'success',
+      summary: 'Alice payload delivery was inferred from Bob receiving the payload.',
+      timestamp: nextTimestamp(6),
+      details: {
+        ...sharedDetails,
+        sourceIp: input.payload.sourceIp,
+        destinationIp: input.payload.destinationIp,
+      },
+    }),
+  ];
+};
+
 const finalVerdictEvent = (
   messageId: string,
   verdict: VerificationVerdict,
+  context?: BobRequestContext,
 ): MessageEvent => {
-  return createEvent({
+  return createBobEvent({
     messageId,
     stage: 'final_verdict',
     status: verdict.accepted ? 'success' : 'rejected',
     summary: verdict.humanSummary,
     details: {
+      ...buildTestingContextDetails(context),
       accepted: verdict.accepted,
       reasonCode: verdict.reasonCode,
       failureStage: verdict.failureStage,
@@ -87,7 +235,10 @@ const persistProcessedMessage = (
 };
 
 export interface BobService {
-  processPayload: (payload: MessagePayload) => {
+  processPayload: (
+    payload: MessagePayload,
+    context?: BobRequestContext,
+  ) => {
     messageId: string;
     verdict: VerificationVerdict;
   };
@@ -99,14 +250,22 @@ export const createBobService = (input: {
   logger: Logger;
 }): BobService => {
   return {
-    processPayload: (payload) => {
+    processPayload: (payload, context) => {
+      const existingMessage =
+        input.repository.findMessageDetail(payload.messageId);
+      const contextDetails = {
+        ...buildRequestContextDetails(context),
+        ...buildTestingContextDetails(context),
+      };
+
       const events: MessageEvent[] = [
-        createEvent({
+        createBobEvent({
           messageId: payload.messageId,
           stage: 'receive_payload',
           status: 'success',
           summary: 'Payload accepted for Bob processing.',
           details: {
+            ...contextDetails,
             sourceIp: payload.sourceIp,
             destinationIp: payload.destinationIp,
             senderId: payload.senderId,
@@ -125,12 +284,13 @@ export const createBobService = (input: {
         );
 
         events.push(
-          createEvent({
+          createBobEvent({
             messageId: payload.messageId,
             stage: 'decrypt_symmetric_key',
             status: 'success',
             summary: 'Encrypted symmetric key decrypted successfully.',
             details: {
+              ...contextDetails,
               algorithm: payload.algorithms.asymmetricEncryption,
               maskedSymmetricKey: symmetricKey.toString('base64'),
             },
@@ -146,12 +306,13 @@ export const createBobService = (input: {
           });
 
           events.push(
-            createEvent({
+            createBobEvent({
               messageId: payload.messageId,
               stage: 'decrypt_ciphertext',
               status: 'success',
               summary: 'Ciphertext decrypted successfully.',
               details: {
+                ...contextDetails,
                 algorithm: payload.algorithms.symmetric,
                 plaintextLength: decryptedPlaintext.length,
               },
@@ -159,12 +320,13 @@ export const createBobService = (input: {
           );
         } catch (error) {
           events.push(
-            createEvent({
+            createBobEvent({
               messageId: payload.messageId,
               stage: 'decrypt_ciphertext',
               status: 'failure',
               summary: 'Ciphertext decryption failed.',
               details: {
+                ...contextDetails,
                 errorMessage:
                   error instanceof Error ? error.message : 'Unknown error',
               },
@@ -182,10 +344,21 @@ export const createBobService = (input: {
               'Payload rejected because ciphertext decryption failed.',
           });
 
-          events.push(finalVerdictEvent(payload.messageId, verdict));
+          if (!existingMessage) {
+            events.unshift(
+              ...createInferredAliceTimeline({
+                payload,
+                decryptedPlaintext: null,
+                ...(context ? { context } : {}),
+              }),
+            );
+          }
+
+          events.push(finalVerdictEvent(payload.messageId, verdict, context));
 
           persistProcessedMessage(input.repository, {
             payload,
+            ...(existingMessage ? {} : { plaintext: null }),
             decryptedPlaintext: null,
             verdict,
             events,
@@ -193,7 +366,7 @@ export const createBobService = (input: {
           });
 
           input.logger.warn(
-            { messageId: payload.messageId, verdict },
+            { messageId: payload.messageId, verdict, context: contextDetails },
             'Bob rejected payload during ciphertext decryption',
           );
 
@@ -208,7 +381,7 @@ export const createBobService = (input: {
           computedPlaintextHashHex === payload.plaintextHashHex;
 
         events.push(
-          createEvent({
+          createBobEvent({
             messageId: payload.messageId,
             stage: 'verify_hash',
             status: integrityValid ? 'success' : 'failure',
@@ -216,6 +389,7 @@ export const createBobService = (input: {
               ? 'Plaintext hash matches transmitted hash.'
               : 'Plaintext hash does not match transmitted hash.',
             details: {
+              ...contextDetails,
               expectedHashHex: payload.plaintextHashHex,
               computedHashHex: computedPlaintextHashHex,
             },
@@ -230,7 +404,7 @@ export const createBobService = (input: {
         });
 
         events.push(
-          createEvent({
+          createBobEvent({
             messageId: payload.messageId,
             stage: 'verify_signature',
             status: signatureValid ? 'success' : 'failure',
@@ -238,6 +412,7 @@ export const createBobService = (input: {
               ? 'Digital signature verified successfully.'
               : 'Digital signature verification failed.',
             details: {
+              ...contextDetails,
               algorithm: payload.algorithms.signature,
             },
           }),
@@ -279,12 +454,13 @@ export const createBobService = (input: {
         }
       } catch (error) {
         events.push(
-          createEvent({
+          createBobEvent({
             messageId: payload.messageId,
             stage: 'decrypt_symmetric_key',
             status: 'failure',
             summary: 'Encrypted symmetric key decryption failed.',
             details: {
+              ...contextDetails,
               errorMessage:
                 error instanceof Error ? error.message : 'Unknown error',
             },
@@ -303,10 +479,21 @@ export const createBobService = (input: {
         });
       }
 
-      events.push(finalVerdictEvent(payload.messageId, verdict));
+      if (!existingMessage) {
+        events.unshift(
+          ...createInferredAliceTimeline({
+            payload,
+            decryptedPlaintext,
+            ...(context ? { context } : {}),
+          }),
+        );
+      }
+
+      events.push(finalVerdictEvent(payload.messageId, verdict, context));
 
       const processedRecord: ProcessedMessageRecord = {
         payload,
+        ...(existingMessage ? {} : { plaintext: decryptedPlaintext }),
         decryptedPlaintext,
         verdict,
         events,
@@ -321,6 +508,7 @@ export const createBobService = (input: {
           accepted: verdict.accepted,
           reasonCode: verdict.reasonCode,
           failureStage: verdict.failureStage,
+          context: contextDetails,
         },
         'Bob processed payload',
       );

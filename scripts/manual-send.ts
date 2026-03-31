@@ -12,6 +12,10 @@ import {
   tryOpenUrl,
   writeJsonOutput,
 } from './support/cli';
+import {
+  createTestRunId,
+  createTestingHeaders,
+} from './support/validation-artifacts';
 
 const { values } = parseArgs({
   options: {
@@ -34,6 +38,12 @@ const { values } = parseArgs({
       type: 'boolean',
     },
     'env-file': {
+      type: 'string',
+    },
+    scenario: {
+      type: 'string',
+    },
+    'test-run-id': {
       type: 'string',
     },
   },
@@ -64,9 +74,17 @@ const main = async () => {
     recipientIp: values['recipient-ip'],
   });
   const targetBaseUrl = resolveTargetBaseUrl(values.target, env);
+  const testRunId = values['test-run-id'] ?? createTestRunId();
   const transportResult = await transportClient.sendPayload(
     targetBaseUrl,
     preparedMessage.payload,
+    {
+      headers: createTestingHeaders({
+        validationMode: 'manual_send',
+        testRunId,
+        scenario: values.scenario ?? 'manual-send',
+      }),
+    },
   );
 
   const detailUrl = `${targetBaseUrl}/messages/${preparedMessage.payload.messageId}`;
@@ -74,6 +92,8 @@ const main = async () => {
     messageId: preparedMessage.payload.messageId,
     targetBaseUrl,
     detailUrl,
+    testRunId,
+    scenario: values.scenario ?? 'manual-send',
     payload: preparedMessage.payload,
     verdict: transportResult.ok ? transportResult.verdict : null,
     transportFailure: transportResult.ok

@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 
 import { messagePayloadSchema } from '@ii3230/shared';
 
+import { createBobRequestContext } from './request-context';
 import type { BobService } from './service';
 
 export const createBobRouter = (input: { bobService: BobService }) => {
@@ -20,7 +21,10 @@ export const createBobRouter = (input: { bobService: BobService }) => {
       return;
     }
 
-    const result = input.bobService.processPayload(parsedPayload.data);
+    const result = input.bobService.processPayload(
+      parsedPayload.data,
+      createBobRequestContext(request),
+    );
 
     response.status(200).json({
       status: 'processed',

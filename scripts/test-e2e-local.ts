@@ -8,8 +8,10 @@ import { fetchJson } from './support/http';
 import {
   assertAcceptedMessage,
   createArtifactRunDirectory,
+  createTestRunId,
+  createTestingHeaders,
   writeMessageArtifacts,
-} from './support/phase4';
+} from './support/validation-artifacts';
 
 const { values } = parseArgs({
   options: {
@@ -42,6 +44,7 @@ const main = async () => {
     values.target ?? env.BOB_TARGET_BASE_URL,
     env,
   );
+  const testRunId = createTestRunId();
   const aliceService = createAliceService({
     env,
     keyMaterial: loadAliceSendKeyMaterial(env),
@@ -63,6 +66,11 @@ const main = async () => {
     url: `${targetBaseUrl}/internal/messages/receive`,
     method: 'POST',
     body: preparedMessage.payload,
+    headers: createTestingHeaders({
+      validationMode: 'phase4_happy_path',
+      testRunId,
+      scenario: 'happy-path',
+    }),
   });
 
   const runDir = createArtifactRunDirectory();
@@ -70,6 +78,7 @@ const main = async () => {
     path.join(runDir, 'happy-path-response.json'),
     {
       targetBaseUrl,
+      testRunId,
       payload: preparedMessage.payload,
       response,
     },
@@ -89,6 +98,7 @@ const main = async () => {
   const summary = {
     targetBaseUrl,
     artifactDir: runDir,
+    testRunId,
     happyPath: {
       status: 'passed',
       messageId: preparedMessage.payload.messageId,
