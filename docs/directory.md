@@ -32,7 +32,7 @@ Primary runtime application for the backend/API.
 - `src/app.ts`
   - Express application setup
   - route registration
-  - health, readiness, Bob receive, and message query surfaces
+  - health, readiness, Alice orchestration, Bob receive, and message query surfaces
 - `src/server.ts`
   - HTTP server bootstrap
 - `src/config/`
@@ -43,12 +43,16 @@ Primary runtime application for the backend/API.
   - migration runner
 - `src/logger.ts`
   - Pino logger factory
+- `src/modules/alice/`
+  - Alice payload preparation service
+  - Bob transport client
+  - `POST /messages` orchestration route
 - `src/modules/bob/`
   - Bob receive route
   - Bob verification service
-  - Bob persistence repository
 - `src/modules/messages/`
-  - list and detail query services/routes for persisted Bob-side evidence
+  - lifecycle-aware message repository
+  - list and detail query services/routes for persisted Alice/Bob evidence
 - `src/runtime/`
   - app runtime assembly
   - key material loading
@@ -72,6 +76,7 @@ Shared contracts and crypto primitives used across runtime surfaces.
   - payload schema
   - verdict schema
   - message event schema
+  - create-message and lifecycle schemas
   - identity and environment schemas
   - stage and status enums
 - `src/crypto/`
@@ -93,6 +98,16 @@ Operator and local-development scripts.
 
 - `generate-local-keys.ts`
   - local non-production RSA key generation
+- `manual-send.ts`
+  - local Alice-side send flow against a Bob base URL
+- `manual-fetch-message.ts`
+  - fetches one stored message detail by message ID
+- `manual-fetch-logs.ts`
+  - fetches one stored event timeline by message ID
+- `manual-tamper.ts`
+  - constructs or mutates a payload and submits it to Bob for negative-path validation
+- `support/`
+  - CLI env loading, JSON output helpers, and HTTP wrappers for the manual scripts
 
 ### `docker/`
 
@@ -150,4 +165,3 @@ Installed dependencies. Never treat this as source code.
 - shared contracts and crypto behavior: `packages/shared/src/`
 - implementation decisions: `docs/adr/`
 - product/roadmap/session memory: `internals/`
-

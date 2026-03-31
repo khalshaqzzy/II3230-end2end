@@ -5,21 +5,20 @@ import { createTestHarness } from '../../test-support/fixtures';
 import { createBobService } from './service';
 
 const createRepositorySpy = () => {
-  const savedMessages: Parameters<
-    ReturnType<typeof createBobService>['processPayload']
-  >[] = [];
   const processedRecords: unknown[] = [];
 
   return {
     repository: {
-      saveProcessedMessage: (input: unknown) => {
+      createPreparedMessage: () => {},
+      appendEvents: () => {},
+      markTransportFailure: () => {},
+      finalizeProcessedMessage: (input: unknown) => {
         processedRecords.push(input);
       },
       listMessages: () => [],
       findMessageDetail: () => null,
     },
     processedRecords,
-    savedMessages,
   };
 };
 
@@ -87,7 +86,8 @@ describe('Bob verification service', () => {
     });
     const { payload } = harness.createPayload();
 
-    payload.ciphertextB64 = `${payload.ciphertextB64.slice(0, -1)}A`;
+    const midpoint = Math.floor(payload.ciphertextB64.length / 2);
+    payload.ciphertextB64 = `${payload.ciphertextB64.slice(0, midpoint)}A${payload.ciphertextB64.slice(midpoint + 1)}`;
 
     try {
       const result = bobService.processPayload(payload);

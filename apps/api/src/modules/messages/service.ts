@@ -1,11 +1,13 @@
 import type {
   MessageEvent,
+  MessageLifecycleState,
   MessagePayload,
+  TransportFailure,
   VerificationVerdict,
 } from '@ii3230/shared';
 import { sanitizeArtifactDetails } from '@ii3230/shared';
 
-import type { BobRepository } from '../bob/repository';
+import type { MessageRepository } from './repository';
 
 const sanitizeValue = <T>(value: T): T => {
   return sanitizeArtifactDetails(value) as T;
@@ -17,21 +19,22 @@ export interface MessageListResponse {
     senderId: string;
     recipientId: string;
     createdAt: string;
-    processedAt: string;
-    accepted: boolean;
-    reasonCode: VerificationVerdict['reasonCode'];
-    failureStage: VerificationVerdict['failureStage'];
+    processedAt: string | null;
+    lifecycleState: MessageLifecycleState;
+    verdict: VerificationVerdict | null;
   }[];
 }
 
 export interface MessageDetailResponse {
   messageId: string;
   createdAt: string;
-  processedAt: string;
+  processedAt: string | null;
+  lifecycleState: MessageLifecycleState;
   payload: MessagePayload;
   plaintext: string | null;
   decryptedPlaintext: string | null;
-  verdict: VerificationVerdict;
+  verdict: VerificationVerdict | null;
+  transportFailure: TransportFailure | null;
   events: MessageEvent[];
 }
 
@@ -41,7 +44,7 @@ export interface MessageQueryService {
 }
 
 export const createMessageQueryService = (input: {
-  repository: BobRepository;
+  repository: MessageRepository;
 }): MessageQueryService => {
   return {
     listMessages: () => {
@@ -52,9 +55,8 @@ export const createMessageQueryService = (input: {
           recipientId: message.recipientId,
           createdAt: message.createdAt,
           processedAt: message.processedAt,
-          accepted: message.accepted,
-          reasonCode: message.reasonCode,
-          failureStage: message.failureStage,
+          lifecycleState: message.lifecycleState,
+          verdict: sanitizeValue(message.verdict),
         })),
       };
     },
@@ -69,10 +71,12 @@ export const createMessageQueryService = (input: {
         messageId: detail.payload.messageId,
         createdAt: detail.createdAt,
         processedAt: detail.processedAt,
+        lifecycleState: detail.lifecycleState,
         payload: sanitizeValue(detail.payload),
         plaintext: detail.plaintext,
         decryptedPlaintext: detail.decryptedPlaintext,
         verdict: sanitizeValue(detail.verdict),
+        transportFailure: sanitizeValue(detail.transportFailure),
         events: sanitizeValue(detail.events),
       };
     },

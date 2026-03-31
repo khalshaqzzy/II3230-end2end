@@ -14,8 +14,8 @@ services:
       ALICE_PUBLIC_KEY_PATH: /data/keys/alice/public.pem
       BOB_PRIVATE_KEY_PATH: /data/keys/bob/private.pem
       BOB_PUBLIC_KEY_PATH: /data/keys/bob/public.pem
+      BOB_TARGET_BASE_URL: http://127.0.0.1:4000
     ports:
       - '4000:4000'
     volumes:
       - ../.local/data:/data
-

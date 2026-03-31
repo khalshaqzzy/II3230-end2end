@@ -12,8 +12,10 @@ import {
 import type { Logger } from 'pino';
 
 import type { RuntimeKeyMaterial } from '../../runtime/load-key-material';
-import type { BobRepository } from './repository';
-import type { ProcessedMessageRecord } from './types';
+import type {
+  MessageRepository,
+  ProcessedMessageRecord,
+} from '../messages/repository';
 
 const nowIso = () => new Date().toISOString();
 
@@ -78,10 +80,10 @@ const finalVerdictEvent = (
 };
 
 const persistProcessedMessage = (
-  repository: BobRepository,
+  repository: MessageRepository,
   record: ProcessedMessageRecord,
 ) => {
-  repository.saveProcessedMessage(record);
+  repository.finalizeProcessedMessage(record);
 };
 
 export interface BobService {
@@ -93,7 +95,7 @@ export interface BobService {
 
 export const createBobService = (input: {
   keyMaterial: RuntimeKeyMaterial;
-  repository: BobRepository;
+  repository: MessageRepository;
   logger: Logger;
 }): BobService => {
   return {
@@ -184,7 +186,6 @@ export const createBobService = (input: {
 
           persistProcessedMessage(input.repository, {
             payload,
-            plaintext: null,
             decryptedPlaintext: null,
             verdict,
             events,
@@ -306,7 +307,6 @@ export const createBobService = (input: {
 
       const processedRecord: ProcessedMessageRecord = {
         payload,
-        plaintext: null,
         decryptedPlaintext,
         verdict,
         events,

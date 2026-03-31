@@ -3,8 +3,11 @@ import type { Logger } from 'pino';
 
 import { createDatabaseClient } from '../db/client';
 import { runDatabaseMigrations } from '../db/migrate';
-import { createBobRepository } from '../modules/bob/repository';
+import { createMessageCommandService } from '../modules/alice/orchestrator';
+import { createAliceService } from '../modules/alice/service';
+import { createBobTransportClient } from '../modules/alice/transport';
 import { createBobService } from '../modules/bob/service';
+import { createMessageRepository } from '../modules/messages/repository';
 import { createMessageQueryService } from '../modules/messages/service';
 import {
   type RuntimeKeyMaterial,
@@ -12,6 +15,7 @@ import {
 } from './load-key-material';
 
 export interface AppRuntime {
+  messageCommandService: ReturnType<typeof createMessageCommandService>;
   bobService: ReturnType<typeof createBobService>;
   messageQueryService: ReturnType<typeof createMessageQueryService>;
   keyMaterial: RuntimeKeyMaterial;
@@ -27,9 +31,23 @@ export const createAppRuntime = (input: {
 
   runDatabaseMigrations(databaseClient);
 
-  const repository = createBobRepository(databaseClient);
+  const repository = createMessageRepository(databaseClient);
+  const aliceService = createAliceService({
+    env: input.env,
+    keyMaterial,
+  });
+  const bobTransportClient = createBobTransportClient({
+    logger: input.logger,
+  });
 
   return {
+    messageCommandService: createMessageCommandService({
+      env: input.env,
+      aliceService,
+      bobTransportClient,
+      repository,
+      logger: input.logger,
+    }),
     bobService: createBobService({
       keyMaterial,
       repository,

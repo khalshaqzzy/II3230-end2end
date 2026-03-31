@@ -80,7 +80,9 @@ const writeKeyPair = (
   fs.writeFileSync(path.join(actorDir, 'public.pem'), keyPair.publicKeyPem);
 };
 
-export const createTestHarness = (): TestHarness => {
+export const createTestHarness = (input?: {
+  envOverrides?: Partial<AppEnv>;
+}): TestHarness => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ii3230-api-'));
   const keysDir = path.join(tempRoot, 'keys');
   const dataDir = path.join(tempRoot, 'data');
@@ -108,6 +110,8 @@ export const createTestHarness = (): TestHarness => {
     ALICE_PUBLIC_KEY_PATH: path.join(keysDir, 'alice', 'public.pem'),
     BOB_PRIVATE_KEY_PATH: path.join(keysDir, 'bob', 'private.pem'),
     BOB_PUBLIC_KEY_PATH: path.join(keysDir, 'bob', 'public.pem'),
+    BOB_TARGET_BASE_URL: 'http://127.0.0.1:4000',
+    ...input?.envOverrides,
   };
 
   const logger = createLogger(env);

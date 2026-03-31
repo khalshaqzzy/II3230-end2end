@@ -21,6 +21,7 @@ export const appEnvSchema = z.object({
   ALICE_PUBLIC_KEY_PATH: z.string().min(1),
   BOB_PRIVATE_KEY_PATH: z.string().min(1),
   BOB_PUBLIC_KEY_PATH: z.string().min(1),
+  BOB_TARGET_BASE_URL: z.string().url().optional(),
 });
 export type AppEnv = z.infer<typeof appEnvSchema>;
 
