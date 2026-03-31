@@ -1,0 +1,21 @@
+{
+  "name": "@ii3230/api",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsx src/server.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ii3230/shared": "*",
+    "express": "^5.1.0",
+    "pino": "^9.6.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.1",
+    "supertest": "^7.1.0"
+  }
+}
