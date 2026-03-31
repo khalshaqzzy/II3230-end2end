@@ -231,7 +231,7 @@ Jika Anda ingin menguji skenario tertentu secara manual, gunakan script berikut.
 Kirim pesan biasa:
 
 ```powershell
-npx tsx scripts/manual-send.ts --env-file .env.alice.local --target http://<bob-lan-ip>:4000 --message "Bob, ini pesan LAN untuk validasi lokal."
+npx tsx scripts/manual-send.ts --env-file .env.alice.local --target http://<bob-lan-ip>:4000 --message "Bob, ini pesan happy-path LAN untuk validasi."
 ```
 
 Tamper ciphertext:

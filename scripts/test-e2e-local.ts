@@ -38,7 +38,7 @@ const { values } = parseArgs({
 
 const main = async () => {
   const plaintext =
-    values.message ?? 'Bob, ini pesan happy-path LAN untuk validasi Phase 4.';
+    values.message ?? 'Bob, ini pesan happy-path LAN untuk validasi.';
   const env = loadScriptEnv({ envFile: values['env-file'] });
   const targetBaseUrl = resolveTargetBaseUrl(
     values.target ?? env.BOB_TARGET_BASE_URL,
