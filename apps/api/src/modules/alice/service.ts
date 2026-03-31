@@ -16,7 +16,7 @@ import {
   wrapSymmetricKey,
 } from '@ii3230/shared';
 
-import type { RuntimeKeyMaterial } from '../../runtime/load-key-material';
+import type { AliceSendKeyMaterial } from '../../runtime/load-key-material';
 
 const nowIso = () => new Date().toISOString();
 
@@ -49,15 +49,21 @@ export interface AliceService {
     plaintext: string;
     senderIp?: string;
     recipientIp?: string;
+    bobPublicKeyPemOverride?: string;
   }) => PreparedMessage;
 }
 
 export const createAliceService = (input: {
   env: AppEnv;
-  keyMaterial: RuntimeKeyMaterial;
+  keyMaterial: AliceSendKeyMaterial;
 }): AliceService => {
   return {
-    prepareMessage: ({ plaintext, senderIp, recipientIp }) => {
+    prepareMessage: ({
+      plaintext,
+      senderIp,
+      recipientIp,
+      bobPublicKeyPemOverride,
+    }) => {
       const messageId = randomUUID();
       const createdAt = nowIso();
       const symmetricKey = generateSymmetricKey();
@@ -77,7 +83,7 @@ export const createAliceService = (input: {
         ciphertextB64: encryptedPayload.ciphertextB64,
         encryptedSymmetricKeyB64: wrapSymmetricKey(
           symmetricKey,
-          input.keyMaterial.bobPublicKeyPem,
+          bobPublicKeyPemOverride ?? input.keyMaterial.bobPublicKeyPem,
         ),
         plaintextHashHex,
         signatureInputVersion: SIGNATURE_INPUT_VERSION,

@@ -17,10 +17,10 @@ export const appEnvSchema = z.object({
   APP_DATA_DIR: z.string().min(1),
   ALICE_LOGICAL_IP: z.string().min(1),
   BOB_LOGICAL_IP: z.string().min(1),
-  ALICE_PRIVATE_KEY_PATH: z.string().min(1),
-  ALICE_PUBLIC_KEY_PATH: z.string().min(1),
-  BOB_PRIVATE_KEY_PATH: z.string().min(1),
-  BOB_PUBLIC_KEY_PATH: z.string().min(1),
+  ALICE_PRIVATE_KEY_PATH: z.string().min(1).optional(),
+  ALICE_PUBLIC_KEY_PATH: z.string().min(1).optional(),
+  BOB_PRIVATE_KEY_PATH: z.string().min(1).optional(),
+  BOB_PUBLIC_KEY_PATH: z.string().min(1).optional(),
   BOB_TARGET_BASE_URL: z.string().url().optional(),
 });
 export type AppEnv = z.infer<typeof appEnvSchema>;

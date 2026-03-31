@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-const PROJECT_ROOT_SEGMENTS_UP = 3;
+const PROJECT_ROOT_SEGMENTS_UP = 4;
 
 export const resolveProjectPath = (...segments: string[]) => {
   const [firstSegment] = segments;

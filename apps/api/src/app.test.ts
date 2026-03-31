@@ -63,6 +63,32 @@ describe('API routes', () => {
     }
   });
 
+  it('starts in Bob-only mode without Alice private key material', async () => {
+    const harness = createTestHarness({
+      envOverrides: {
+        ALICE_PRIVATE_KEY_PATH: undefined,
+      },
+    });
+    const { payload } = harness.createPayload();
+
+    try {
+      const createResponse = await request(harness.app).post('/messages').send({
+        plaintext: 'Alice route should not be mounted in Bob-only mode.',
+      });
+
+      expect(createResponse.status).toBe(404);
+
+      const processResponse = await request(harness.app)
+        .post('/internal/messages/receive')
+        .send(payload);
+
+      expect(processResponse.status).toBe(200);
+      expect(processResponse.body.verdict.accepted).toBe(true);
+    } finally {
+      harness.cleanup();
+    }
+  });
+
   it('processes a valid Bob payload and exposes persisted evidence', async () => {
     const harness = createTestHarness();
     const { payload, plaintext } = harness.createPayload();

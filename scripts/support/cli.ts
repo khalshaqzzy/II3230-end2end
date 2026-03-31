@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 
 import type { AppEnv } from '@ii3230/shared';
 import { parseAppEnv, sanitizeArtifactDetails } from '@ii3230/shared';
@@ -32,62 +33,86 @@ const parseDotenvFile = (filePath: string): Record<string, string> => {
 };
 
 const defaultPort = '4000';
+const defaultKeyBaseDir = '.local/data/keys';
 
-export const loadScriptEnv = (): AppEnv => {
-  const envLocal = parseDotenvFile('.env.local');
-  const envFile = parseDotenvFile('.env');
+const resolveDotenvPath = (filePath: string) => {
+  return path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
+};
+
+export const loadScriptEnv = (input?: { envFile?: string }): AppEnv => {
+  const envFile = parseDotenvFile(resolveDotenvPath('.env'));
+  const envLocal = parseDotenvFile(resolveDotenvPath('.env.local'));
+  const explicitEnvFile = input?.envFile
+    ? parseDotenvFile(resolveDotenvPath(input.envFile))
+    : {};
 
   return parseAppEnv({
     ...envFile,
     ...envLocal,
-    PORT: process.env.PORT ?? envLocal.PORT ?? envFile.PORT ?? defaultPort,
+    ...explicitEnvFile,
+    PORT:
+      process.env.PORT ??
+      explicitEnvFile.PORT ??
+      envLocal.PORT ??
+      envFile.PORT ??
+      defaultPort,
     LOG_LEVEL:
       process.env.LOG_LEVEL ??
+      explicitEnvFile.LOG_LEVEL ??
       envLocal.LOG_LEVEL ??
       envFile.LOG_LEVEL ??
       'info',
     APP_ENV:
       process.env.APP_ENV ??
+      explicitEnvFile.APP_ENV ??
       envLocal.APP_ENV ??
       envFile.APP_ENV ??
       'development',
     APP_DATA_DIR:
       process.env.APP_DATA_DIR ??
+      explicitEnvFile.APP_DATA_DIR ??
       envLocal.APP_DATA_DIR ??
       envFile.APP_DATA_DIR ??
       '.local/data',
     ALICE_LOGICAL_IP:
       process.env.ALICE_LOGICAL_IP ??
+      explicitEnvFile.ALICE_LOGICAL_IP ??
       envLocal.ALICE_LOGICAL_IP ??
       envFile.ALICE_LOGICAL_IP ??
       '10.10.0.2',
     BOB_LOGICAL_IP:
       process.env.BOB_LOGICAL_IP ??
+      explicitEnvFile.BOB_LOGICAL_IP ??
       envLocal.BOB_LOGICAL_IP ??
       envFile.BOB_LOGICAL_IP ??
       '10.10.0.3',
     ALICE_PRIVATE_KEY_PATH:
       process.env.ALICE_PRIVATE_KEY_PATH ??
+      explicitEnvFile.ALICE_PRIVATE_KEY_PATH ??
       envLocal.ALICE_PRIVATE_KEY_PATH ??
       envFile.ALICE_PRIVATE_KEY_PATH ??
-      '.local/keys/alice/private.pem',
+      `${defaultKeyBaseDir}/alice/private.pem`,
     ALICE_PUBLIC_KEY_PATH:
       process.env.ALICE_PUBLIC_KEY_PATH ??
+      explicitEnvFile.ALICE_PUBLIC_KEY_PATH ??
       envLocal.ALICE_PUBLIC_KEY_PATH ??
       envFile.ALICE_PUBLIC_KEY_PATH ??
-      '.local/keys/alice/public.pem',
+      `${defaultKeyBaseDir}/alice/public.pem`,
     BOB_PRIVATE_KEY_PATH:
       process.env.BOB_PRIVATE_KEY_PATH ??
+      explicitEnvFile.BOB_PRIVATE_KEY_PATH ??
       envLocal.BOB_PRIVATE_KEY_PATH ??
       envFile.BOB_PRIVATE_KEY_PATH ??
-      '.local/keys/bob/private.pem',
+      `${defaultKeyBaseDir}/bob/private.pem`,
     BOB_PUBLIC_KEY_PATH:
       process.env.BOB_PUBLIC_KEY_PATH ??
+      explicitEnvFile.BOB_PUBLIC_KEY_PATH ??
       envLocal.BOB_PUBLIC_KEY_PATH ??
       envFile.BOB_PUBLIC_KEY_PATH ??
-      '.local/keys/bob/public.pem',
+      `${defaultKeyBaseDir}/bob/public.pem`,
     BOB_TARGET_BASE_URL:
       process.env.BOB_TARGET_BASE_URL ??
+      explicitEnvFile.BOB_TARGET_BASE_URL ??
       envLocal.BOB_TARGET_BASE_URL ??
       envFile.BOB_TARGET_BASE_URL,
   });
@@ -108,7 +133,7 @@ export const writeJsonOutput = (
     return;
   }
 
-  fs.mkdirSync(require('node:path').dirname(outputPath), { recursive: true });
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(
     outputPath,
     JSON.stringify(sanitizeArtifactDetails(value), null, 2),

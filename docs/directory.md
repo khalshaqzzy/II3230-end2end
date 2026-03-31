@@ -9,9 +9,12 @@ Created: 2026-03-31
 ```text
 apps/
   api/
+artifacts/
+  local-tests/
 docker/
 docs/
   adr/
+  local-lan-runbook.md
 drafts/
 internals/
 packages/
@@ -97,7 +100,7 @@ Generated output:
 Operator and local-development scripts.
 
 - `generate-local-keys.ts`
-  - local non-production RSA key generation
+  - local non-production RSA key generation under `.local/data/keys/`
 - `manual-send.ts`
   - local Alice-side send flow against a Bob base URL
 - `manual-fetch-message.ts`
@@ -106,6 +109,12 @@ Operator and local-development scripts.
   - fetches one stored event timeline by message ID
 - `manual-tamper.ts`
   - constructs or mutates a payload and submits it to Bob for negative-path validation
+- `run-bob.ts`
+  - Bob-side env-file aware runtime launcher for LAN validation
+- `test-e2e-local.ts`
+  - happy-path Phase 4 harness with artifact capture
+- `test-e2e-tamper.ts`
+  - tamper-path Phase 4 harness with artifact capture
 - `support/`
   - CLI env loading, JSON output helpers, and HTTP wrappers for the manual scripts
 
@@ -124,6 +133,8 @@ Engineering documentation that belongs with the implementation.
 
 - `directory.md`
   - this source code directory map
+- `local-lan-runbook.md`
+  - canonical Phase 4 operator runbook for Alice/Bob LAN validation
 - `adr/`
   - architecture decision records that freeze durable technical choices
 
@@ -150,10 +161,18 @@ Reference deployment artifacts from earlier exploration.
 
 Local generated assets that should not be treated as tracked source.
 
-- `keys/`
-  - locally generated Alice/Bob keypairs for development and testing
 - `data/`
   - local SQLite database files when using the default root-relative app data directory
+  - locally generated Alice/Bob keypairs under `.local/data/keys/`
+
+### `artifacts/`
+
+Generated evidence from local validation runs.
+
+- `local-tests/<timestamp>/`
+  - happy-path and tamper summaries
+  - per-message detail exports
+  - per-message event-log exports
 
 ### `node_modules/`
 

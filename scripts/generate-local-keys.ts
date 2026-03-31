@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const actors = ['alice', 'bob'] as const;
-const baseDir = process.argv[2] ?? '.local/keys';
+const baseDir = process.argv[2] ?? '.local/data/keys';
 
 for (const actor of actors) {
   const actorDir = join(baseDir, actor);

@@ -17,6 +17,9 @@ const { values, positionals } = parseArgs({
     output: {
       type: 'string',
     },
+    'env-file': {
+      type: 'string',
+    },
   },
 });
 
@@ -26,11 +29,17 @@ if (!messageId) {
   throw new Error('messageId is required as the first positional argument.');
 }
 
-const env = loadScriptEnv();
-const targetBaseUrl = resolveTargetBaseUrl(values.target, env);
-const detail = await fetchJson({
-  url: `${targetBaseUrl}/messages/${messageId}`,
-});
+const main = async () => {
+  const env = loadScriptEnv({ envFile: values['env-file'] });
+  const targetBaseUrl = resolveTargetBaseUrl(values.target, env);
+  const detail = await fetchJson({
+    url: `${targetBaseUrl}/messages/${messageId}`,
+  });
 
-writeJsonOutput(values.output, detail);
-printJson(detail);
+  writeJsonOutput(values.output, detail);
+  printJson(detail);
+};
+
+void main().catch((error) => {
+  throw error;
+});

@@ -11,7 +11,7 @@ import {
 } from '@ii3230/shared';
 import type { Logger } from 'pino';
 
-import type { RuntimeKeyMaterial } from '../../runtime/load-key-material';
+import type { BobReceiveKeyMaterial } from '../../runtime/load-key-material';
 import type {
   MessageRepository,
   ProcessedMessageRecord,
@@ -94,7 +94,7 @@ export interface BobService {
 }
 
 export const createBobService = (input: {
-  keyMaterial: RuntimeKeyMaterial;
+  keyMaterial: BobReceiveKeyMaterial;
   repository: MessageRepository;
   logger: Logger;
 }): BobService => {

@@ -10,53 +10,93 @@ import { createBobService } from '../modules/bob/service';
 import { createMessageRepository } from '../modules/messages/repository';
 import { createMessageQueryService } from '../modules/messages/service';
 import {
+  type AliceSendKeyMaterial,
+  type BobReceiveKeyMaterial,
   type RuntimeKeyMaterial,
+  loadAliceSendKeyMaterial,
+  loadBobReceiveKeyMaterial,
   loadRuntimeKeyMaterial,
 } from './load-key-material';
 
 export interface AppRuntime {
-  messageCommandService: ReturnType<typeof createMessageCommandService>;
+  messageCommandService: ReturnType<typeof createMessageCommandService> | null;
   bobService: ReturnType<typeof createBobService>;
   messageQueryService: ReturnType<typeof createMessageQueryService>;
-  keyMaterial: RuntimeKeyMaterial;
+  keyMaterial: {
+    alice: AliceSendKeyMaterial | null;
+    bob: BobReceiveKeyMaterial;
+    monolith: RuntimeKeyMaterial | null;
+  };
   close: () => void;
 }
+
+const maybeLoadAliceSendKeyMaterial = (env: AppEnv) => {
+  if (
+    !env.ALICE_PRIVATE_KEY_PATH ||
+    !env.ALICE_PUBLIC_KEY_PATH ||
+    !env.BOB_PUBLIC_KEY_PATH
+  ) {
+    return null;
+  }
+
+  return loadAliceSendKeyMaterial(env);
+};
+
+const maybeLoadMonolithKeyMaterial = (env: AppEnv) => {
+  if (
+    !env.ALICE_PRIVATE_KEY_PATH ||
+    !env.ALICE_PUBLIC_KEY_PATH ||
+    !env.BOB_PRIVATE_KEY_PATH ||
+    !env.BOB_PUBLIC_KEY_PATH
+  ) {
+    return null;
+  }
+
+  return loadRuntimeKeyMaterial(env);
+};
 
 export const createAppRuntime = (input: {
   env: AppEnv;
   logger: Logger;
 }): AppRuntime => {
-  const keyMaterial = loadRuntimeKeyMaterial(input.env);
+  const bobKeyMaterial = loadBobReceiveKeyMaterial(input.env);
+  const aliceKeyMaterial = maybeLoadAliceSendKeyMaterial(input.env);
+  const monolithKeyMaterial = maybeLoadMonolithKeyMaterial(input.env);
   const databaseClient = createDatabaseClient(input.env);
 
   runDatabaseMigrations(databaseClient);
 
   const repository = createMessageRepository(databaseClient);
-  const aliceService = createAliceService({
-    env: input.env,
-    keyMaterial,
-  });
-  const bobTransportClient = createBobTransportClient({
-    logger: input.logger,
-  });
+  const messageCommandService = aliceKeyMaterial
+    ? createMessageCommandService({
+        env: input.env,
+        aliceService: createAliceService({
+          env: input.env,
+          keyMaterial: aliceKeyMaterial,
+        }),
+        bobTransportClient: createBobTransportClient({
+          logger: input.logger,
+        }),
+        repository,
+        logger: input.logger,
+      })
+    : null;
 
   return {
-    messageCommandService: createMessageCommandService({
-      env: input.env,
-      aliceService,
-      bobTransportClient,
-      repository,
-      logger: input.logger,
-    }),
+    messageCommandService,
     bobService: createBobService({
-      keyMaterial,
+      keyMaterial: bobKeyMaterial,
       repository,
       logger: input.logger,
     }),
     messageQueryService: createMessageQueryService({
       repository,
     }),
-    keyMaterial,
+    keyMaterial: {
+      alice: aliceKeyMaterial,
+      bob: bobKeyMaterial,
+      monolith: monolithKeyMaterial,
+    },
     close: () => {
       databaseClient.close();
     },

@@ -46,11 +46,13 @@ export const createApp = (input: {
     });
   });
 
-  app.use(
-    createAliceRouter({
-      messageCommandService: input.runtime.messageCommandService,
-    }),
-  );
+  if (input.runtime.messageCommandService) {
+    app.use(
+      createAliceRouter({
+        messageCommandService: input.runtime.messageCommandService,
+      }),
+    );
+  }
   app.use(createBobRouter({ bobService: input.runtime.bobService }));
   app.use(
     createMessagesRouter({

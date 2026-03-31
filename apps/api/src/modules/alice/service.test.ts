@@ -8,7 +8,7 @@ describe('Alice service', () => {
     const harness = createTestHarness();
     const aliceService = createAliceService({
       env: harness.env,
-      keyMaterial: harness.runtime.keyMaterial,
+      keyMaterial: harness.runtime.keyMaterial.alice!,
     });
 
     try {
@@ -35,7 +35,7 @@ describe('Alice service', () => {
     const harness = createTestHarness();
     const aliceService = createAliceService({
       env: harness.env,
-      keyMaterial: harness.runtime.keyMaterial,
+      keyMaterial: harness.runtime.keyMaterial.alice!,
     });
 
     try {
@@ -56,7 +56,7 @@ describe('Alice service', () => {
     const harness = createTestHarness();
     const aliceService = createAliceService({
       env: harness.env,
-      keyMaterial: harness.runtime.keyMaterial,
+      keyMaterial: harness.runtime.keyMaterial.alice!,
     });
 
     try {
